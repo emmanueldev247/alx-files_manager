@@ -5,7 +5,7 @@ class RedisClient {
     this.client = createClient();
     this.isClientConnected = true;
 
-    this.client.on('error', err => {
+    this.client.on('error', (err) => {
       console.log(err);
       this.isClientConnected = false;
     });
@@ -40,4 +40,3 @@ class RedisClient {
 const redisClient = new RedisClient();
 
 module.exports = redisClient;
-
