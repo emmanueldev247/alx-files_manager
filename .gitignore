@@ -1,4 +1,3 @@
-*main.js
 *.sw?
-*main*.js
+dump.rdb
 node_modules/
