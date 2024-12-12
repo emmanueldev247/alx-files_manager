@@ -21,7 +21,6 @@ class UsersController {
 
       return res.status(201).json({ id: newUser.insertedId, email });
     } catch (error) {
-
       console.log(error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
