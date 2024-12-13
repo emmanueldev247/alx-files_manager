@@ -90,12 +90,14 @@ class FilesController {
       if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
       const filesCollection = await dbClient.DB.collection('files');
-      const fileDocument = await filesCollection.findOne({ _id: ObjectId(id) });
-      const fileDocument2 = await filesCollection.findOne({ userId: ObjectId(userId) });
-      if (!fileDocument && !fileDocument2) return res.status(404).json({ error: 'Not found' });
+      const fileDocument = await filesCollection.findOne(
+        { _id: ObjectId(id), userId: ObjectId(userId) },
+      );
+
+      if (!fileDocument) return res.status(404).json({ error: 'Not found' });
 
       const response = {
-        id: fileDocument.id,
+        id: fileDocument._id,
         userId: fileDocument.userId,
         name: fileDocument.name,
         type: fileDocument.type,
@@ -103,7 +105,7 @@ class FilesController {
         parentId: fileDocument.parentId,
       };
 
-      return res.status(201).json(response);
+      return res.status(200).json(response);
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Internal Server Error' });
@@ -112,7 +114,51 @@ class FilesController {
 
   static async getIndex(req, res) {
     try {
-      return res.status(200).json({ success: 'true' });
+      const xToken = req.headers['x-token'];
+      const key = `auth_${xToken}`;
+      const userId = await redisClient.get(key);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { parentId = '0', page = '0' } = req.query;
+      const parentIdValue = parentId === '0' ? parentId : ObjectId(parentId);
+      const limit = 20;
+
+      const skip = parseInt(page, 10) * limit;
+
+      if (!dbClient.DB) await dbClient.init();
+      const filesCollection = await dbClient.DB.collection('files');
+      const matchQuery = { userId: ObjectId(userId) };
+
+      if (parentId !== '0') {
+        matchQuery.parentId = parentIdValue;
+      }
+      const fileDocuments = await filesCollection.aggregate([
+        { $match: matchQuery },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            _id: 1,
+            userId: 1,
+            name: 1,
+            type: 1,
+            isPublic: 1,
+            parentId: 1,
+          },
+        },
+      ]).toArray();
+
+      if (fileDocuments.length === 0) return res.status(200).json([]);
+      const response = fileDocuments.map((doc) => ({
+        id: doc._id,
+        userId: doc.userId,
+        name: doc.name,
+        type: doc.type,
+        isPublic: doc.isPublic,
+        parentId: doc.parentId,
+      }));
+
+      return res.status(200).json(response);
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Internal Server Error' });
