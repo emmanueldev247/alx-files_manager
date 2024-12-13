@@ -50,11 +50,8 @@ class FilesController {
         fileDocument.id = result.insertedId;
       } else {
         const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
-        const parentFolderPath = parentId === '0'
-          ? FOLDER_PATH
-          : path.join(FOLDER_PATH, parentId);
-        await fs.mkdir(parentFolderPath, { recursive: true });
-        const localPath = path.join(parentFolderPath, uuidv4());
+        await fs.mkdir(FOLDER_PATH, { recursive: true });
+        const localPath = path.join(FOLDER_PATH, uuidv4());
         fs.writeFile(localPath, Buffer.from(data, 'base64'));
 
         fileDocument.localPath = localPath;
