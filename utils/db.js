@@ -4,7 +4,6 @@ class DBClient {
   constructor() {
     const HOST = process.env.DB_HOST || 'localhost';
     const PORT = process.env.DB_PORT || '27017';
-    const DB_NAME = process.env.DB_DATABASE || 'files_manager';
     const URI = `mongodb://${HOST}:${PORT}`;
 
     this.client = new MongoClient(URI, {
@@ -12,11 +11,12 @@ class DBClient {
       useUnifiedTopology: true,
     });
 
-    this.init(DB_NAME);
+    this.init();
   }
 
-  async init(DB_NAME) {
+  async init() {
     try {
+      const DB_NAME = process.env.DB_DATABASE || 'files_manager';
       await this.client.connect();
       this.DB = this.client.db(DB_NAME);
     } catch (err) {
