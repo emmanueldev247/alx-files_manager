@@ -11,6 +11,7 @@ class UsersController {
     if (!password) return res.status(400).json({ error: 'Missing password' });
 
     try {
+      if (!dbClient.DB) await dbClient.init();
       const usersCollection = dbClient.DB.collection('users');
       const user = await usersCollection.findOne({ email });
 
@@ -34,6 +35,7 @@ class UsersController {
       const userId = await redisClient.get(key);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+      if (!dbClient.DB) await dbClient.init();
       const usersCollection = dbClient.DB.collection('users');
       const user = await usersCollection.findOne({ _id: ObjectId(userId) });
 
