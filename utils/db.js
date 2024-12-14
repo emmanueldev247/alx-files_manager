@@ -9,6 +9,7 @@ class DBClient {
     this.client = new MongoClient(URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000,
     });
 
     this.init();

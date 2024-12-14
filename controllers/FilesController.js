@@ -1,5 +1,7 @@
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsp = require('fs').promises;
+const mime = require('mime-types');
 const { ObjectId } = require('mongodb');
 const { v4: uuidv4 } = require('uuid');
 const dbClient = require('../utils/db');
@@ -50,9 +52,9 @@ class FilesController {
         fileDocument.id = result.insertedId;
       } else {
         const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
-        await fs.mkdir(FOLDER_PATH, { recursive: true });
+        await fsp.mkdir(FOLDER_PATH, { recursive: true });
         const localPath = path.join(FOLDER_PATH, uuidv4());
-        fs.writeFile(localPath, Buffer.from(data, 'base64'));
+        await fsp.writeFile(localPath, Buffer.from(data, 'base64'));
 
         fileDocument.localPath = localPath;
         const result = await filesCollection.insertOne(fileDocument);
@@ -243,6 +245,65 @@ class FilesController {
       };
 
       return res.status(200).json(response);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  static async getFile(req, res) {
+    try {
+      const xToken = req.headers['x-token'];
+      const key = `auth_${xToken}`;
+      const userId = await redisClient.get(key);
+
+      const { id } = req.params;
+
+      if (!dbClient.DB) await dbClient.init();
+      const usersCollection = await dbClient.DB.collection('users');
+
+      let user = null;
+      if (userId) {
+        user = await usersCollection.findOne({ _id: ObjectId(userId) });
+      }
+
+      const filesCollection = await dbClient.DB.collection('files');
+      const fileDocument = await filesCollection.findOne({ _id: ObjectId(id) });
+
+      if (!fileDocument) return res.status(404).json({ error: 'Not found' });
+
+      if (!fileDocument.isPublic
+         && (!user || user._id.toString() !== fileDocument.userId.toString())) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      if (fileDocument.type === 'folder') {
+        return res.status(400).json({ error: 'A folder doesn\'t have content' });
+      }
+
+      if (!fs.existsSync(fileDocument.localPath)) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const mimeType = mime.lookup(fileDocument.name);
+      if (!mimeType) {
+        return res.status(415).json({ error: 'Unsupported file type' });
+      }
+
+      const fileContent = await fsp.readFile(fileDocument.localPath);
+
+      let convertedContent;
+      console.log(`Mime-Type: ${mimeType}`);
+
+      if (mimeType.startsWith('text/')) {
+        convertedContent = fileContent.toString('utf-8');
+        res.setHeader('Content-Type', mimeType);
+        return res.send(convertedContent);
+      }
+
+      convertedContent = fileContent.toString('base64');
+      res.setHeader('Content-Type', 'application/octet-stream');
+      return res.send(convertedContent);
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Internal Server Error' });
